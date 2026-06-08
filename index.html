@@ -521,20 +521,20 @@
             <button class="type-button" type="button" data-triangle-type="obtuse" aria-pressed="false">둔각</button>
           </div>
           <h2 class="step-title"><span class="step-number">3</span>길이 직접 조정</h2>
-          <p class="rule-note">추천 적용: 밑변과 높이는 자연수만 입력하고, 넓이도 자연수가 되도록 밑변과 높이 중 적어도 하나는 짝수로 입력합니다.</p>
+          <p class="rule-note">추천 적용: 밑변과 높이는 1부터 100까지의 자연수만 입력하고, 넓이도 자연수가 되도록 밑변과 높이 중 적어도 하나는 짝수로 입력합니다.</p>
           <div class="field-grid">
             <div class="field-group">
               <div class="field-row" data-field="base">
                 <label>
                   밑변의 길이
-                  <input id="baseInput" type="number" min="1" step="1" inputmode="numeric" pattern="[0-9]*">
+                  <input id="baseInput" type="number" min="1" max="100" step="1" inputmode="numeric" pattern="[0-9]*">
                 </label>
                 <button class="hide-toggle" type="button" data-hide="base" aria-pressed="false">숨김</button>
               </div>
               <div class="field-row" data-field="height">
                 <label>
                   높이의 길이
-                  <input id="heightInput" type="number" min="1" step="1" inputmode="numeric" pattern="[0-9]*">
+                  <input id="heightInput" type="number" min="1" max="100" step="1" inputmode="numeric" pattern="[0-9]*">
                 </label>
                 <button class="hide-toggle" type="button" data-hide="height" aria-pressed="false">숨김</button>
               </div>
@@ -573,6 +573,8 @@
       { x: 506, y: 342 },
       { x: 360, y: 92 }
     ];
+
+    const LENGTH_MAX = 100;
 
     const state = {
       selectedSide: 0,
@@ -625,11 +627,24 @@
       return state.hidden[kind] ? "□" : `${format(state[kind])}${unit}`;
     }
 
-    function parseNatural(input) {
+    function parseNatural(input, options = {}) {
       if (input.value.trim() === "") return null;
       const value = Number(input.value);
       if (!Number.isInteger(value) || value < 1) return null;
+      if (options.max !== undefined && value > options.max) return null;
       return value;
+    }
+
+    function parseLength(input) {
+      return parseNatural(input, { max: LENGTH_MAX });
+    }
+
+    function clampLengthInput(input) {
+      if (input.value.trim() === "") return;
+      const value = Number(input.value);
+      if (Number.isFinite(value) && value > LENGTH_MAX) {
+        input.value = String(LENGTH_MAX);
+      }
     }
 
     function setNotReady(message) {
@@ -735,11 +750,11 @@
     }
 
     function setFromBaseHeight() {
-      const base = parseNatural(els.baseInput);
-      const height = parseNatural(els.heightInput);
+      const base = parseLength(els.baseInput);
+      const height = parseLength(els.heightInput);
       if (base === null || height === null) {
         els.areaInput.value = "";
-        setNotReady("밑변과 높이를 자연수로 입력하면 삼각형이 보입니다.");
+        setNotReady("밑변과 높이를 1부터 100까지의 자연수로 입력하면 삼각형이 보입니다.");
         return;
       }
 
@@ -769,11 +784,16 @@
 
       state.area = area;
 
-      const typedBase = parseNatural(els.baseInput);
+      const typedBase = parseLength(els.baseInput);
       if (typedBase !== null) {
         if ((area * 2) % typedBase !== 0) {
           els.heightInput.value = "";
           setNotReady("현재 밑변으로는 높이가 자연수가 되지 않습니다. 밑변을 지우거나 다른 자연수를 입력하세요.");
+          return;
+        }
+        if ((state.area * 2) / typedBase > LENGTH_MAX) {
+          els.heightInput.value = "";
+          setNotReady("계산된 높이가 100보다 큽니다. 넓이를 줄이거나 다른 밑변을 입력하세요.");
           return;
         }
         setReady();
@@ -783,9 +803,14 @@
         state.base = state.shapeBase;
         state.height = state.shapeHeight;
       } else {
+        const pickedBase = pickBaseForArea(state.area);
+        if ((state.area * 2) / pickedBase > LENGTH_MAX) {
+          setNotReady("계산된 밑변과 높이가 100 이하여야 삼각형을 만들 수 있습니다.");
+          return;
+        }
         setReady();
         state.selectedSide = 0;
-        state.shapeBase = pickBaseForArea(state.area);
+        state.shapeBase = pickedBase;
         state.shapeHeight = (state.area * 2) / state.shapeBase;
         state.base = state.shapeBase;
         state.height = state.shapeHeight;
@@ -797,8 +822,8 @@
 
     function pickBaseForArea(area) {
       const doubleArea = area * 2;
-      const candidates = [2, 4, 5, 6, 8, 10, 12, 15, 16, 20];
-      return candidates.find((candidate) => doubleArea % candidate === 0 && doubleArea / candidate >= 1 && doubleArea / candidate <= 20) || 2;
+      const candidates = [2, 4, 5, 6, 8, 10, 12, 15, 16, 20, 25, 40, 50, 80, 100];
+      return candidates.find((candidate) => doubleArea % candidate === 0 && doubleArea / candidate >= 1 && doubleArea / candidate <= LENGTH_MAX) || 2;
     }
 
     function syncInputs(skip) {
@@ -911,8 +936,14 @@
       });
     });
 
-    els.baseInput.addEventListener("input", setFromBaseHeight);
-    els.heightInput.addEventListener("input", setFromBaseHeight);
+    els.baseInput.addEventListener("input", () => {
+      clampLengthInput(els.baseInput);
+      setFromBaseHeight();
+    });
+    els.heightInput.addEventListener("input", () => {
+      clampLengthInput(els.heightInput);
+      setFromBaseHeight();
+    });
     els.areaInput.addEventListener("input", setFromArea);
 
     els.typeButtons.forEach((button) => {
@@ -935,7 +966,7 @@
       els.baseInput.value = "";
       els.heightInput.value = "";
       els.areaInput.value = "";
-      setNotReady("밑변과 높이를 자연수로 입력하면 삼각형이 보입니다.");
+      setNotReady("밑변과 높이를 1부터 100까지의 자연수로 입력하면 삼각형이 보입니다.");
     });
 
     els.showAnswer.addEventListener("click", () => {
