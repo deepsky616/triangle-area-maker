@@ -521,7 +521,7 @@
             <button class="type-button" type="button" data-triangle-type="obtuse" aria-pressed="false">둔각</button>
           </div>
           <h2 class="step-title"><span class="step-number">3</span>길이 직접 조정</h2>
-          <p class="rule-note">추천 적용: 밑변과 높이는 1부터 100까지의 자연수만 입력하고, 넓이도 자연수가 되도록 밑변과 높이 중 적어도 하나는 짝수로 입력합니다.</p>
+          <p class="rule-note">추천 적용: 밑변과 높이는 1부터 100까지의 수로 입력합니다.</p>
           <div class="field-grid">
             <div class="field-group">
               <div class="field-row" data-field="base">
@@ -618,7 +618,8 @@
     }
 
     function format(value) {
-      return String(Math.round(value));
+      const rounded = round(value);
+      return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace(/\.0$/, "");
     }
 
     function visibleValue(kind, unit) {
@@ -635,7 +636,10 @@
     }
 
     function parseLength(input) {
-      return parseNatural(input, { max: LENGTH_MAX });
+      if (input.value.trim() === "") return null;
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || value < 1 || value > LENGTH_MAX) return null;
+      return round(value);
     }
 
     function clampLengthInput(input) {
@@ -713,13 +717,7 @@
 
     function selectBaseSide(sideIndex) {
       if (!state.isReady) return;
-      const nextMeasurements = measureSide(sideIndex);
       state.selectedSide = sideIndex;
-      state.shapeBase = nextMeasurements.base;
-      state.shapeHeight = nextMeasurements.height;
-      state.base = nextMeasurements.base;
-      state.height = nextMeasurements.height;
-      state.area = nextMeasurements.area;
       render({ syncInputValues: true });
     }
 
@@ -742,9 +740,8 @@
     }
 
     function getPixelsPerCentimeter() {
-      const [a, b] = getSidePairs()[state.selectedSide];
-      const selectedSidePixels = distance(a, b);
-      return selectedSidePixels / state.shapeBase;
+      const [a, b] = getSidePairs()[0];
+      return distance(a, b) / state.shapeBase;
     }
 
     function getAltitudeDistance(a, b, p) {
@@ -756,14 +753,13 @@
       const sidePairs = getSidePairs();
       const [a, b] = sidePairs[sideIndex];
       const pixelsPerCentimeter = getPixelsPerCentimeter();
-      const nextBase = Math.max(1, Math.round(distance(a, b) / pixelsPerCentimeter));
-      const nextArea = Math.max(1, Math.round(state.shapeBase * state.shapeHeight / 2));
-      let nextHeight = Math.max(1, Math.round((nextArea * 2) / nextBase));
-      if ((nextBase * nextHeight) % 2 !== 0) nextHeight += 1;
+      const nextBase = Math.max(1, round(distance(a, b) / pixelsPerCentimeter));
+      const nextArea = Math.max(1, round(state.shapeBase * state.shapeHeight / 2));
+      const nextHeight = Math.max(1, round((nextArea * 2) / nextBase));
       return {
         base: nextBase,
         height: nextHeight,
-        area: Math.round(nextBase * nextHeight / 2)
+        area: nextArea
       };
     }
 
@@ -784,18 +780,12 @@
         return;
       }
 
-      if ((base * height) % 2 !== 0) {
-        els.areaInput.value = "";
-        setNotReady("넓이도 자연수가 되려면 밑변과 높이 중 적어도 하나는 짝수여야 합니다.");
-        return;
-      }
-
       setReady();
       state.shapeBase = base;
       state.shapeHeight = height;
       state.base = state.shapeBase;
       state.height = state.shapeHeight;
-      state.area = Math.round(state.shapeBase * state.shapeHeight / 2);
+      state.area = round(state.shapeBase * state.shapeHeight / 2);
       syncInputs();
       render();
     }
