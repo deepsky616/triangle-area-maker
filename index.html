@@ -673,6 +673,15 @@
       ];
     }
 
+    function getFootRatio() {
+      const footRatios = {
+        acute: 0.58,
+        right: 0,
+        obtuse: -0.24
+      };
+      return footRatios[state.triangleType] ?? footRatios.acute;
+    }
+
     function buildTrianglePoints() {
       const maxBase = 430;
       const maxHeight = 270;
@@ -683,17 +692,13 @@
       const baseY = 358;
       const left = { x: centerX - basePx / 2, y: baseY };
       const right = { x: centerX + basePx / 2, y: baseY };
-      const footRatios = {
-        acute: 0.58,
-        right: 0,
-        obtuse: -0.24
-      };
-      const footRatio = footRatios[state.triangleType] ?? footRatios.acute;
       const top = {
-        x: left.x + basePx * footRatio,
+        x: left.x + basePx * getFootRatio(),
         y: baseY - heightPx
       };
 
+      if (state.selectedSide === 1) return [top, left, right];
+      if (state.selectedSide === 2) return [right, top, left];
       return [left, right, top];
     }
 
@@ -703,7 +708,13 @@
 
     function selectBaseSide(sideIndex) {
       if (!state.isReady) return;
+      const nextMeasurements = measureSide(sideIndex);
       state.selectedSide = sideIndex;
+      state.shapeBase = nextMeasurements.base;
+      state.shapeHeight = nextMeasurements.height;
+      state.base = nextMeasurements.base;
+      state.height = nextMeasurements.height;
+      state.area = nextMeasurements.area;
       render({ syncInputValues: true });
     }
 
@@ -726,8 +737,9 @@
     }
 
     function getPixelsPerCentimeter() {
-      const bottomSidePixels = distance(points[0], points[1]);
-      return bottomSidePixels / state.shapeBase;
+      const [a, b] = getSidePairs()[state.selectedSide];
+      const selectedSidePixels = distance(a, b);
+      return selectedSidePixels / state.shapeBase;
     }
 
     function getAltitudeDistance(a, b, p) {
@@ -735,17 +747,26 @@
       return distance(p, foot);
     }
 
-    function syncSelectedMeasurements(updateInputs = false) {
+    function measureSide(sideIndex) {
       const sidePairs = getSidePairs();
-      const [a, b, p] = sidePairs[state.selectedSide];
+      const [a, b] = sidePairs[sideIndex];
       const pixelsPerCentimeter = getPixelsPerCentimeter();
       const nextBase = Math.max(1, Math.round(distance(a, b) / pixelsPerCentimeter));
       const nextArea = Math.max(1, Math.round(state.shapeBase * state.shapeHeight / 2));
       let nextHeight = Math.max(1, Math.round((nextArea * 2) / nextBase));
       if ((nextBase * nextHeight) % 2 !== 0) nextHeight += 1;
-      state.base = nextBase;
-      state.height = nextHeight;
-      state.area = Math.round(state.base * state.height / 2);
+      return {
+        base: nextBase,
+        height: nextHeight,
+        area: Math.round(nextBase * nextHeight / 2)
+      };
+    }
+
+    function syncSelectedMeasurements(updateInputs = false) {
+      const nextMeasurements = measureSide(state.selectedSide);
+      state.base = nextMeasurements.base;
+      state.height = nextMeasurements.height;
+      state.area = nextMeasurements.area;
       if (updateInputs) syncInputs();
     }
 
@@ -765,13 +786,12 @@
       }
 
       setReady();
-      state.selectedSide = 0;
       state.shapeBase = base;
       state.shapeHeight = height;
       state.base = state.shapeBase;
       state.height = state.shapeHeight;
       state.area = Math.round(state.shapeBase * state.shapeHeight / 2);
-      syncInputs("area");
+      syncInputs();
       render();
     }
 
@@ -797,7 +817,6 @@
           return;
         }
         setReady();
-        state.selectedSide = 0;
         state.shapeBase = typedBase;
         state.shapeHeight = (state.area * 2) / state.shapeBase;
         state.base = state.shapeBase;
@@ -809,7 +828,6 @@
           return;
         }
         setReady();
-        state.selectedSide = 0;
         state.shapeBase = pickedBase;
         state.shapeHeight = (state.area * 2) / state.shapeBase;
         state.base = state.shapeBase;
