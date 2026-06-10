@@ -521,7 +521,7 @@
             <button class="type-button" type="button" data-triangle-type="obtuse" aria-pressed="false">둔각</button>
           </div>
           <h2 class="step-title"><span class="step-number">3</span>길이 직접 조정</h2>
-          <p class="rule-note">추천 적용: 밑변과 높이는 1부터 100까지의 수로 입력합니다.</p>
+          <p class="rule-note">추천 적용: 밑변과 높이는 1부터 100까지의 자연수만 입력하고, 넓이도 자연수가 되도록 밑변과 높이 중 적어도 하나는 짝수로 입력합니다.</p>
           <div class="field-grid">
             <div class="field-group">
               <div class="field-row" data-field="base">
@@ -618,8 +618,7 @@
     }
 
     function format(value) {
-      const rounded = round(value);
-      return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace(/\.0$/, "");
+      return String(Math.round(value));
     }
 
     function visibleValue(kind, unit) {
@@ -636,10 +635,7 @@
     }
 
     function parseLength(input) {
-      if (input.value.trim() === "") return null;
-      const value = Number(input.value);
-      if (!Number.isFinite(value) || value < 1 || value > LENGTH_MAX) return null;
-      return round(value);
+      return parseNatural(input, { max: LENGTH_MAX });
     }
 
     function clampLengthInput(input) {
@@ -753,14 +749,33 @@
       const sidePairs = getSidePairs();
       const [a, b] = sidePairs[sideIndex];
       const pixelsPerCentimeter = getPixelsPerCentimeter();
-      const nextBase = Math.max(1, round(distance(a, b) / pixelsPerCentimeter));
-      const nextArea = Math.max(1, round(state.shapeBase * state.shapeHeight / 2));
-      const nextHeight = Math.max(1, round((nextArea * 2) / nextBase));
+      const measuredBase = Math.max(1, distance(a, b) / pixelsPerCentimeter);
+      const nextArea = Math.max(1, Math.round(state.shapeBase * state.shapeHeight / 2));
+      const nextBase = pickNaturalBaseForArea(nextArea, measuredBase);
+      const nextHeight = Math.max(1, Math.round((nextArea * 2) / nextBase));
       return {
         base: nextBase,
         height: nextHeight,
         area: nextArea
       };
+    }
+
+    function pickNaturalBaseForArea(area, preferredBase) {
+      const doubleArea = area * 2;
+      let bestBase = null;
+      let bestDistance = Infinity;
+
+      for (let candidate = 1; candidate <= LENGTH_MAX; candidate += 1) {
+        const height = doubleArea / candidate;
+        if (!Number.isInteger(height) || height < 1 || height > LENGTH_MAX) continue;
+        const distanceFromPreferred = Math.abs(candidate - preferredBase);
+        if (distanceFromPreferred < bestDistance) {
+          bestBase = candidate;
+          bestDistance = distanceFromPreferred;
+        }
+      }
+
+      return bestBase ?? Math.max(1, Math.min(LENGTH_MAX, Math.round(preferredBase)));
     }
 
     function syncSelectedMeasurements(updateInputs = false) {
@@ -780,14 +795,20 @@
         return;
       }
 
+      if ((base * height) % 2 !== 0) {
+        els.areaInput.value = "";
+        setNotReady("넓이도 자연수가 되려면 밑변과 높이 중 적어도 하나는 짝수여야 합니다.");
+        return;
+      }
+
       setReady();
       state.shapeBase = base;
       state.shapeHeight = height;
       state.base = state.shapeBase;
       state.height = state.shapeHeight;
-      state.area = round(state.shapeBase * state.shapeHeight / 2);
+      state.area = Math.round(state.shapeBase * state.shapeHeight / 2);
       syncInputs();
-      render();
+      render({ preserveMeasurements: true });
     }
 
     function setFromArea() {
@@ -830,7 +851,7 @@
       }
 
       syncInputs("baseHeight");
-      render();
+      render({ preserveMeasurements: true });
     }
 
     function pickBaseForArea(area) {
@@ -854,7 +875,9 @@
       setReady();
       points = buildTrianglePoints();
       const sidePairs = getSidePairs();
-      syncSelectedMeasurements(Boolean(options.syncInputValues));
+      if (!options.preserveMeasurements) {
+        syncSelectedMeasurements(Boolean(options.syncInputValues));
+      }
       els.triangleFill.setAttribute("points", points.map((p) => `${p.x},${p.y}`).join(" "));
 
       sidePairs.forEach(([a, b], index) => {
