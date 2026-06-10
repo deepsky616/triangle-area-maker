@@ -704,10 +704,7 @@
     }
 
     function buildTrianglePoints() {
-      const [left, right, top] = buildBaseTrianglePoints();
-      if (state.selectedSide === 1) return [top, left, right];
-      if (state.selectedSide === 2) return [right, top, left];
-      return [left, right, top];
+      return buildBaseTrianglePoints();
     }
 
     function distance(a, b) {
