@@ -575,6 +575,11 @@
     ];
 
     const LENGTH_MAX = 100;
+    const SIDE_NAME_POSITIONS = [
+      { x: 312, y: 414 },
+      { x: 497, y: 214 },
+      { x: 178, y: 212 }
+    ];
 
     const state = {
       selectedSide: 0,
@@ -665,12 +670,16 @@
       els.triangleWrap.classList.remove("empty");
     }
 
-    function getSidePairs() {
+    function getSidePairsForPoints(sourcePoints) {
       return [
-        [points[0], points[1], points[2]],
-        [points[1], points[2], points[0]],
-        [points[2], points[0], points[1]]
+        [sourcePoints[0], sourcePoints[1], sourcePoints[2]],
+        [sourcePoints[1], sourcePoints[2], sourcePoints[0]],
+        [sourcePoints[2], sourcePoints[0], sourcePoints[1]]
       ];
+    }
+
+    function getSidePairs() {
+      return getSidePairsForPoints(points);
     }
 
     function getFootRatio() {
@@ -682,7 +691,7 @@
       return footRatios[state.triangleType] ?? footRatios.acute;
     }
 
-    function buildTrianglePoints() {
+    function buildBaseTrianglePoints() {
       const maxBase = 430;
       const maxHeight = 270;
       const scale = Math.min(maxBase / state.shapeBase, maxHeight / state.shapeHeight, 38);
@@ -697,6 +706,11 @@
         y: baseY - heightPx
       };
 
+      return [left, right, top];
+    }
+
+    function buildTrianglePoints() {
+      const [left, right, top] = buildBaseTrianglePoints();
       if (state.selectedSide === 1) return [top, left, right];
       if (state.selectedSide === 2) return [right, top, left];
       return [left, right, top];
@@ -865,7 +879,7 @@
       sidePairs.forEach(([a, b], index) => {
         document.querySelectorAll(`[data-side="${index}"], [data-side-line="${index}"]`).forEach((line) => setLine(line, a, b));
       });
-      renderSideNames(sidePairs);
+      renderSideNames();
 
       const [a, b, p] = sidePairs[state.selectedSide];
       const foot = getFoot(a, b, p);
@@ -888,20 +902,8 @@
       renderTypeControls();
     }
 
-    function renderSideNames(sidePairs) {
-      const center = {
-        x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
-        y: points.reduce((sum, point) => sum + point.y, 0) / points.length
-      };
-
-      sidePairs.forEach(([a, b], index) => {
-        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-        const awayFromCenter = { x: mid.x - center.x, y: mid.y - center.y };
-        const length = Math.hypot(awayFromCenter.x, awayFromCenter.y) || 1;
-        const label = {
-          x: mid.x + (awayFromCenter.x / length) * 56,
-          y: mid.y + (awayFromCenter.y / length) * 56
-        };
+    function renderSideNames() {
+      SIDE_NAME_POSITIONS.forEach((label, index) => {
         const group = els.sideNameGroups[index];
         group.querySelector("circle").setAttribute("cx", label.x);
         group.querySelector("circle").setAttribute("cy", label.y);
