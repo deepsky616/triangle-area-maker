@@ -575,12 +575,6 @@
     ];
 
     const LENGTH_MAX = 100;
-    const SIDE_NAME_POSITIONS = [
-      { x: 312, y: 414 },
-      { x: 497, y: 214 },
-      { x: 178, y: 212 }
-    ];
-
     const state = {
       selectedSide: 0,
       triangleType: "acute",
@@ -879,7 +873,7 @@
       sidePairs.forEach(([a, b], index) => {
         document.querySelectorAll(`[data-side="${index}"], [data-side-line="${index}"]`).forEach((line) => setLine(line, a, b));
       });
-      renderSideNames();
+      renderSideNames(sidePairs);
 
       const [a, b, p] = sidePairs[state.selectedSide];
       const foot = getFoot(a, b, p);
@@ -902,8 +896,20 @@
       renderTypeControls();
     }
 
-    function renderSideNames() {
-      SIDE_NAME_POSITIONS.forEach((label, index) => {
+    function renderSideNames(sidePairs) {
+      const center = {
+        x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+        y: points.reduce((sum, point) => sum + point.y, 0) / points.length
+      };
+
+      sidePairs.forEach(([a, b], index) => {
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const awayFromCenter = { x: mid.x - center.x, y: mid.y - center.y };
+        const length = Math.hypot(awayFromCenter.x, awayFromCenter.y) || 1;
+        const label = {
+          x: mid.x + (awayFromCenter.x / length) * 56,
+          y: mid.y + (awayFromCenter.y / length) * 56
+        };
         const group = els.sideNameGroups[index];
         group.querySelector("circle").setAttribute("cx", label.x);
         group.querySelector("circle").setAttribute("cy", label.y);
